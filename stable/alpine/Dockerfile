@@ -67,10 +67,12 @@ RUN set -x \
             && su nobody -s /bin/sh -c " \
                 export HOME=${tempDir} \
                 && cd ${tempDir} \
+                && git clone https://github.com/Refinitiv/ngx_http_websocket_stat_module.git \
                 && hg clone https://hg.nginx.org/pkg-oss \
                 && cd pkg-oss \
                 && hg up ${NGINX_VERSION}-${PKG_RELEASE} \
                 && cd alpine \
+                && sed -i "s/--with-stream_ssl_preread_module/--with-stream_ssl_preread_module --add-module=${$HOME}\/ngx_http_websocket_stat_module/g" Makefile\
                 && make all \
                 && apk index -o ${tempDir}/packages/alpine/${apkArch}/APKINDEX.tar.gz ${tempDir}/packages/alpine/${apkArch}/*.apk \
                 && abuild-sign -k ${tempDir}/.abuild/abuild-key.rsa ${tempDir}/packages/alpine/${apkArch}/APKINDEX.tar.gz \

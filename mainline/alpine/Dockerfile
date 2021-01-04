@@ -25,25 +25,7 @@ RUN set -x \
     " \
     && case "$apkArch" in \
         x86_64) \
-# arches officially built by upstream
-            set -x \
-            && KEY_SHA512="e7fa8303923d9b95db37a77ad46c68fd4755ff935d0a534d26eba83de193c76166c68bfe7f65471bf8881004ef4aa6df3e34689c305662750c0172fca5d8552a *stdin" \
-            && apk add --no-cache --virtual .cert-deps \
-                openssl \
-            && wget -O /tmp/nginx_signing.rsa.pub https://nginx.org/keys/nginx_signing.rsa.pub \
-            && if [ "$(openssl rsa -pubin -in /tmp/nginx_signing.rsa.pub -text -noout | openssl sha512 -r)" = "$KEY_SHA512" ]; then \
-                echo "key verification succeeded!"; \
-                mv /tmp/nginx_signing.rsa.pub /etc/apk/keys/; \
-            else \
-                echo "key verification failed!"; \
-                exit 1; \
-            fi \
-            && apk del .cert-deps \
-            && apk add -X "https://nginx.org/packages/mainline/alpine/v$(egrep -o '^[0-9]+\.[0-9]+' /etc/alpine-release)/main" --no-cache $nginxPackages \
-            ;; \
-        *) \
-# we're on an architecture upstream doesn't officially build for
-# let's build binaries from the published packaging sources
+# Force build
             set -x \
             && tempDir="$(mktemp -d)" \
             && chown nobody:nobody $tempDir \
@@ -64,6 +46,7 @@ RUN set -x \
                 bash \
                 alpine-sdk \
                 findutils \
+            && cd / &&  git clone https://github.com/Refinitiv/ngx_http_websocket_stat_module.git \
             && su nobody -s /bin/sh -c " \
                 export HOME=${tempDir} \
                 && cd ${tempDir} \
@@ -71,6 +54,7 @@ RUN set -x \
                 && cd pkg-oss \
                 && hg up ${NGINX_VERSION}-${PKG_RELEASE} \
                 && cd alpine \
+                && sed -i \"s/--with-stream_ssl_preread_module/--with-stream_ssl_preread_module --add-module=\/ngx_http_websocket_stat_module/g\" Makefile \
                 && make all \
                 && apk index -o ${tempDir}/packages/alpine/${apkArch}/APKINDEX.tar.gz ${tempDir}/packages/alpine/${apkArch}/*.apk \
                 && abuild-sign -k ${tempDir}/.abuild/abuild-key.rsa ${tempDir}/packages/alpine/${apkArch}/APKINDEX.tar.gz \
@@ -78,6 +62,9 @@ RUN set -x \
             && cp ${tempDir}/.abuild/abuild-key.rsa.pub /etc/apk/keys/ \
             && apk del .build-deps \
             && apk add -X ${tempDir}/packages/alpine/ --no-cache $nginxPackages \
+            ;; \
+        *) \
+            echo "NOTHING TO BUILD!!!" \
             ;; \
     esac \
 # if we have leftovers from building, let's purge them (including extra, unnecessary build deps)
